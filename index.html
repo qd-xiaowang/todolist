@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vue 3 Todo List (Inline)</title>
+    <!-- 引入 Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            outline: none;
+        }
+        select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            outline: none;
+            background-color: white;
+            cursor: pointer;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: #42b983;
+            color: white;
+            font-weight: bold;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        button.delete-btn {
+            background-color: #ff4757;
+            padding: 5px 10px;
+            margin-left: 10px;
+        }
+        button.edit-btn {
+            background-color: #3498db;
+            padding: 5px 10px;
+            margin-left: auto;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            background-color: #fff;
+            border-bottom: 1px solid #eee;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            transition: all 0.2s;
+            border-left: 5px solid transparent; /* Default border */
+        }
+        li:last-child {
+            border-bottom: none;
+        }
+        /* Priority Colors */
+        li.priority-high {
+            border-left-color: #ff4757;
+            background-color: #fff5f6;
+        }
+        li.priority-medium {
+            border-left-color: #ffa502;
+            background-color: #fffbf0;
+        }
+        li.priority-low {
+            border-left-color: #2ed573;
+            background-color: #f0fff4;
+        }
+        
+        li.completed span {
+            text-decoration: line-through;
+            color: #888;
+        }
+        li.completed {
+            opacity: 0.7;
+            background-color: #fafafa; /* Dim background for completed */
+            border-left-color: #ccc; /* Neutralize color for completed */
+        }
+
+        .checkbox {
+            margin-right: 15px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        .empty-state {
+            text-align: center;
+            color: #999;
+            margin-top: 20px;
+        }
+        .edit-input {
+            flex: 1;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .priority-badge {
+            font-size: 0.8em;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-right: 8px;
+            color: white;
+            font-weight: bold;
+        }
+        .bg-high { background-color: #ff4757; }
+        .bg-medium { background-color: #ffa502; }
+        .bg-low { background-color: #2ed573; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="container">
+            <h1>Todo List</h1>
+            
+            <!-- Create -->
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    v-model="newTodo" 
+                    @keyup.enter="addTodo"
+                    placeholder="添加新的待办事项..."
+                >
+                <select v-model="newPriority">
+                    <option value="high">🔴 高优先级</option>
+                    <option value="medium">🟠 中优先级</option>
+                    <option value="low">🟢 低优先级</option>
+                </select>
+                <button @click="addTodo">添加</button>
+            </div>
+
+            <!-- Read -->
+            <ul v-if="todos.length > 0">
+                <li v-for="todo in todos" :key="todo.id" :class="['priority-' + todo.priority, { completed: todo.completed }]">
+                    <!-- Toggle Status -->
+                    <input 
+                        type="checkbox" 
+                        class="checkbox" 
+                        v-model="todo.completed"
+                    >
+                    
+                    <!-- Priority Badge (Optional, but helps clarity) -->
+                    <span class="priority-badge" :class="'bg-' + todo.priority" v-if="!todo.completed">
+                        {{ priorityLabels[todo.priority] }}
+                    </span>
+
+                    <!-- Update (Edit Mode) -->
+                    <template v-if="todo.isEditing">
+                        <input 
+                            type="text" 
+                            v-model="todo.text" 
+                            class="edit-input"
+                            @keyup.enter="finishEdit(todo)"
+                        >
+                        <select v-model="todo.priority" style="margin-left: 5px; padding: 5px;">
+                            <option value="high">高</option>
+                            <option value="medium">中</option>
+                            <option value="low">低</option>
+                        </select>
+                        <button class="edit-btn" @click="finishEdit(todo)">保存</button>
+                    </template>
+
+                    <!-- Update (View Mode) -->
+                    <template v-else>
+                        <span @dblclick="editTodo(todo)" style="flex: 1;">{{ todo.text }}</span>
+                        <!-- Actions -->
+                        <button class="edit-btn" @click="editTodo(todo)">编辑</button>
+                        <!-- Delete -->
+                        <button class="delete-btn" @click="deleteTodo(todo.id)">删除</button>
+                    </template>
+                </li>
+            </ul>
+            
+            <div v-else class="empty-state">
+                暂无待办事项，快去添加一个吧！
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, nextTick, onMounted, watch } = Vue;
+
+        createApp({
+            setup() {
+                const todos = ref([]);
+                const newTodo = ref('');
+                const newPriority = ref('medium'); // Default priority
+
+                const priorityLabels = {
+                    high: '高',
+                    medium: '中',
+                    low: '低'
+                };
+
+                // Load from localStorage
+                onMounted(() => {
+                    const saved = localStorage.getItem('vue-todos');
+                    if (saved) {
+                        try {
+                            const parsed = JSON.parse(saved);
+                            // Migration: ensure all items have a priority
+                            todos.value = parsed.map(t => ({
+                                ...t,
+                                priority: t.priority || 'medium' 
+                            }));
+                        } catch (e) {
+                            console.error('Failed to parse todos', e);
+                        }
+                    }
+                });
+
+                // Save to localStorage
+                watch(todos, (newVal) => {
+                    localStorage.setItem('vue-todos', JSON.stringify(newVal));
+                }, { deep: true });
+
+                // Create
+                const addTodo = () => {
+                    const text = newTodo.value.trim();
+                    if (text) {
+                        todos.value.unshift({
+                            id: Date.now(),
+                            text: text,
+                            completed: false,
+                            isEditing: false,
+                            priority: newPriority.value
+                        });
+                        newTodo.value = '';
+                        // newPriority.value = 'medium'; // Keep last selection or reset? Let's keep it.
+                    }
+                };
+
+                // Delete
+                const deleteTodo = (id) => {
+                    todos.value = todos.value.filter(t => t.id !== id);
+                };
+
+                // Update (Start Edit)
+                const editTodo = (todo) => {
+                    todo.isEditing = true;
+                };
+
+                // Update (Finish Edit)
+                const finishEdit = (todo) => {
+                    if (!todo.text.trim()) {
+                        deleteTodo(todo.id);
+                    } else {
+                        todo.isEditing = false;
+                    }
+                };
+
+                return {
+                    todos,
+                    newTodo,
+                    newPriority,
+                    priorityLabels,
+                    addTodo,
+                    deleteTodo,
+                    editTodo,
+                    finishEdit
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
